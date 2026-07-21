@@ -18,11 +18,11 @@ MixLab is a bilingual web project for collecting convenience-store drink combina
 - Ingredient ratios, preparation steps, and tasting notes
 - Simplified Chinese and English interface
 - Read-only recipe browsing for guests
-- Custom recipes and ratings for signed-in users
+- Email registration, sign-in, verification, and password reset
+- Custom recipes and ratings for verified users
+- Cross-device recipe and rating sync through Firestore
 - Original retail package images on recipe cards
 - Responsive desktop and mobile layouts
-
-> The current sign-in flow is provided by ChatGPT Sites. Custom recipes and ratings are stored in the current browser. The project can later move to Firebase Authentication and a cloud database for email registration and cross-device syncing.
 
 ## Technology
 
@@ -31,6 +31,7 @@ MixLab is a bilingual web project for collecting convenience-store drink combina
 - [Vinext](https://github.com/cloudflare/vinext)
 - [Vite](https://vite.dev/)
 - [Cloudflare Workers](https://workers.cloudflare.com/)-compatible runtime
+- [Firebase Authentication](https://firebase.google.com/docs/auth) and [Cloud Firestore](https://firebase.google.com/docs/firestore)
 - TypeScript
 
 ## Run Locally
@@ -46,10 +47,11 @@ MixLab is a bilingual web project for collecting convenience-store drink combina
 git clone https://github.com/Will-P77/mixlab.git
 cd mixlab
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-Open the local URL printed in the terminal after the development server starts.
+Add your Firebase Web app configuration to `.env.local`, then open the local URL printed by the development server. Firebase Web configuration identifies a project and is not an admin secret; never put a service-account private key in frontend environment variables.
 
 ## Commands
 
@@ -66,10 +68,12 @@ npm run db:generate  # Generate Drizzle migrations after schema changes
 ```text
 MixLab/
 ├── app/                 # Pages, styles, and API routes
+├── lib/                 # Firebase client wrapper
 ├── public/
 │   ├── ingredients/     # Ingredient images
-│   └── packages/        # Original retail package images
-├── tests/               # Rendering and session tests
+│   ├── packages/        # Original retail package images
+│   └── firebase/        # Official Firebase Web SDK browser modules
+├── tests/               # Rendering tests
 ├── worker/              # Cloudflare Worker entry point
 ├── db/                  # Optional database schema
 ├── examples/d1/         # Cloudflare D1 example
@@ -79,14 +83,15 @@ MixLab/
 
 ## Authentication and Data
 
-The current production site uses identity headers supplied by ChatGPT Sites:
+The project uses Firebase Authentication and Firestore:
 
 - Guests can only browse recipes.
-- Signed-in users can add recipes and ratings.
-- Custom data is stored in browser `localStorage`.
-- Local data does not automatically sync after clearing browser storage or changing devices.
+- Users can register with any valid email, sign in, verify their address, and reset their password.
+- Only users with verified email addresses can add recipes and ratings.
+- Each user can only access data below their own `users/{uid}` Firestore path.
+- Legacy local recipes and ratings are migrated to the cloud after the first verified sign-in.
 
-For an independent Cloudflare Workers deployment, Firebase Authentication can provide email registration, sign-in, verification emails, and password resets. Firestore or Cloudflare D1 can provide persistent user data.
+Publish the repository's [`firestore.rules`](./firestore.rules) in Firebase Console and add each local, Cloudflare, or custom hostname to Authentication's Authorized domains list. The Cloudflare build environment also needs the six public variables listed in `.env.example`.
 
 ## Image Policy
 

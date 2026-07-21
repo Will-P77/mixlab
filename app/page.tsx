@@ -1,16 +1,26 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  deleteUserDocument,
+  listUserDocuments,
+  observeFirebaseSession,
+  refreshFirebaseSession,
+  registerWithEmail,
+  resendFirebaseVerification,
+  saveUserDocument,
+  sendFirebasePasswordReset,
+  signInWithEmail,
+  signOutFirebase,
+  type FirebaseSessionUser,
+} from "@/lib/firebase-client";
 
 type Category = "奶香茶饮" | "果味汽水" | "乳酸茶" | "清爽茶饮" | "我的配方";
 type Accent = "yellow" | "blue" | "red" | "green" | "purple";
 type Locale = "zh" | "en";
 
-type SessionUser = {
-  displayName: string;
-  email: string;
-  fullName: string | null;
-};
+type SessionUser = FirebaseSessionUser;
+type AuthMode = "signin" | "register" | "reset" | "verify";
 
 type Mix = {
   id: string;
@@ -398,16 +408,21 @@ const copy = {
     myExperiment: "我的实验", publicIdea: "公开灵感", ratio: "建议比例", noRating: "还没有评分，等你首评",
     guestRating: "登录后可评分并保存记录", editRating: "查看 · 修改评分", rateAfter: "查看配方 · 喝完评分", viewRecipe: "查看完整配方",
     emptyTitle: "这张标签还是空的", emptyBodyUser: "换个关键词，或者把你的第一份搭配贴进来。", emptyBodyGuest: "换个关键词，继续看看公开配方。", addRecipe: "添加配方",
-    footerLead: "每一杯奇怪搭配，都值得被认真记录。", footerUser: "自建配方与评分按登录账户保存在当前浏览器 · 饮料含糖量以包装标注为准", footerGuest: "当前为访客只读模式 · 登录后可以添加配方和评分",
+    footerLead: "每一杯奇怪搭配，都值得被认真记录。", footerUser: "自建配方与评分已同步到登录账户 · 饮料含糖量以包装标注为准", footerGuest: "当前为访客只读模式 · 邮箱登录后可以添加配方和评分",
     photoCredit: "便利店商品原包装", recipeReceipt: "配方小票", closeDetail: "关闭配方详情", viewSource: "查看公开灵感来源 ↗", deleteMine: "删除我的配方",
-    report: "DRINK REPORT", reportTitle: "喝完，打个分", reportBody: "按登录账户保存在当前设备，可随时修改。", overall: "整体好喝度", pending: "待评分",
+    report: "DRINK REPORT", reportTitle: "喝完，打个分", reportBody: "评分会同步到你的 Firebase 账户，可随时修改。", overall: "整体好喝度", pending: "待评分",
     sweetness: "甜度", notSweet: "不甜", verySweet: "很甜", freshness: "清爽度", heavy: "厚重", veryFresh: "很清爽", surprise: "惊喜度", ordinary: "普通", surprising: "超惊喜",
     remake: "下次还愿意再混一杯", flavorNote: "风味小记（可选）", notePlaceholder: "比如：下次少放一点雪碧……", saveRating: "保存这次评分",
-    loginKicker: "MEMBERS ONLY · 登录后解锁", loginTitle: "想留下你的口味记录？", loginBody: "访客可以浏览全部公开配方。登录后即可评分、添加配方，并在这台设备上保留记录。", loginAction: "使用 ChatGPT 登录",
-    addEyebrow: "NEW MIX · 新实验", addTitle: "贴一张自己的配方", addIntro: "至少填两种饮料。配方按登录账户保存在这台设备上。", closeAdd: "关闭添加配方窗口",
+    loginKicker: "MEMBERS ONLY · 邮箱登录后解锁", loginTitle: "想留下你的口味记录？", loginBody: "访客可以浏览全部公开配方。邮箱验证后即可评分、添加配方，并在不同设备同步记录。", loginAction: "邮箱登录 / 注册",
+    addEyebrow: "NEW MIX · 新实验", addTitle: "贴一张自己的配方", addIntro: "至少填两种饮料。配方会保存到你的 Firebase 账户。", closeAdd: "关闭添加配方窗口",
     drinkA: "饮料 A *", drinkB: "饮料 B *", drinkC: "饮料 C（可选）", mixName: "搭配名称（可选）", ratioLabel: "建议比例", method: "混合方法", tasteLike: "喝起来像什么？",
     exampleTea: "例如：茉莉清茶", exampleMilk: "例如：旺仔牛奶", exampleYakult: "例如：养乐多", autoName: "留空会自动组合", ratioExample: "例如：茶 : 奶 = 2 : 1", methodExample: "例如：加冰后依次倒入", expectation: "先写下你的预期，喝完还可以继续评分。", cancel: "先不添加", saveBook: "保存到实验簿",
-    starFirst: "先点一颗星，告诉我们好不好喝", savedRating: "评分已保存在这台设备上", loginRequired: "请先登录，再添加配方或评分", defaultRatio: "按口味", defaultNote: "还没有风味笔记，喝完记得回来评分。", defaultMethod: "加冰后依次倒入，轻轻搅匀", customSource: "我的配方 · 当前设备", added: "新配方已贴进你的实验簿", deleteConfirm: "删除", deviceOnly: "这项操作只影响当前账户在这台设备上的记录。", deleted: "配方已从实验簿移除",
+    starFirst: "先点一颗星，告诉我们好不好喝", savedRating: "评分已同步到你的账户", loginRequired: "请先登录，再添加配方或评分", verifyRequired: "请先完成邮箱验证", defaultRatio: "按口味", defaultNote: "还没有风味笔记，喝完记得回来评分。", defaultMethod: "加冰后依次倒入，轻轻搅匀", customSource: "我的配方 · 云端账户", added: "新配方已同步到你的实验簿", deleteConfirm: "删除", deviceOnly: "这会从你的云端账户中删除该记录。", deleted: "配方已从云端实验簿移除",
+    authTitleSignIn: "邮箱登录", authTitleRegister: "创建 MixLab 账户", authTitleReset: "找回密码", authEmail: "电子邮箱", authPassword: "密码", authConfirm: "确认密码",
+    authSubmitSignIn: "登录", authSubmitRegister: "注册并发送验证邮件", authSubmitReset: "发送重置邮件", authNoAccount: "还没有账户？", authHasAccount: "已经有账户？", authCreate: "立即注册", authBackSignIn: "返回登录", authForgot: "忘记密码？",
+    verifyTitle: "请验证你的邮箱", verifyBody: "验证邮件已经发送。打开邮件中的链接，完成后返回这里刷新状态。", resendVerification: "重新发送验证邮件", checkVerified: "我已完成验证", unverified: "邮箱未验证", verified: "邮箱已验证",
+    verificationSent: "验证邮件已发送，请检查收件箱和垃圾邮件", resetSent: "密码重置邮件已发送", signedIn: "登录成功", registered: "账户已创建，请完成邮箱验证", signedOut: "已安全退出", emailVerifiedNow: "邮箱验证成功，云端实验簿已解锁",
+    passwordMismatch: "两次输入的密码不一致", passwordLength: "密码至少需要 6 个字符", authGenericError: "操作失败，请稍后重试", cloudLoadError: "暂时无法读取云端记录，请检查网络后重试", cloudSaveError: "云端保存失败，请检查网络后重试", authClose: "关闭登录窗口",
   },
   en: {
     brandSub: "Convenience-store drink notebook", backAll: "Back to all mixes", search: "Search drinks or flavors", searchLabel: "Search drink mixes",
@@ -420,16 +435,21 @@ const copy = {
     myExperiment: "My experiment", publicIdea: "Public idea", ratio: "Suggested ratio", noRating: "No rating yet—be the first",
     guestRating: "Sign in to rate and save it", editRating: "View · edit rating", rateAfter: "View recipe · rate it", viewRecipe: "View full recipe",
     emptyTitle: "Nothing under this label", emptyBodyUser: "Try another search or add your first mix.", emptyBodyGuest: "Try another search and explore the public recipes.", addRecipe: "Add recipe",
-    footerLead: "Every unusual mix deserves a proper field note.", footerUser: "Custom recipes and ratings are stored per signed-in account in this browser · Check packaging for sugar content", footerGuest: "You are browsing in guest view-only mode · Sign in to add recipes and ratings",
+    footerLead: "Every unusual mix deserves a proper field note.", footerUser: "Custom recipes and ratings are synced to your signed-in account · Check packaging for sugar content", footerGuest: "You are browsing in guest view-only mode · Sign in with email to add recipes and ratings",
     photoCredit: "Original retail packaging", recipeReceipt: "Recipe receipt", closeDetail: "Close recipe details", viewSource: "View public inspiration source ↗", deleteMine: "Delete my recipe",
-    report: "DRINK REPORT", reportTitle: "Tried it? Rate it", reportBody: "Saved for this account on this device. You can edit it anytime.", overall: "Overall taste", pending: "Not rated",
+    report: "DRINK REPORT", reportTitle: "Tried it? Rate it", reportBody: "Synced to your Firebase account. You can edit it anytime.", overall: "Overall taste", pending: "Not rated",
     sweetness: "Sweetness", notSweet: "Dry", verySweet: "Very sweet", freshness: "Freshness", heavy: "Rich", veryFresh: "Very fresh", surprise: "Surprise", ordinary: "Familiar", surprising: "Unexpected",
     remake: "I would make this again", flavorNote: "Flavor note (optional)", notePlaceholder: "For example: use a little less Sprite next time…", saveRating: "Save this rating",
-    loginKicker: "MEMBERS ONLY · SIGN IN TO UNLOCK", loginTitle: "Want to keep your tasting notes?", loginBody: "Guests can browse every public recipe. Sign in to rate drinks, add recipes and keep records on this device.", loginAction: "Sign in with ChatGPT",
-    addEyebrow: "NEW MIX · NEW EXPERIMENT", addTitle: "Add your own recipe", addIntro: "Enter at least two drinks. It will be saved for this account on this device.", closeAdd: "Close add recipe dialog",
+    loginKicker: "MEMBERS ONLY · EMAIL SIGN-IN REQUIRED", loginTitle: "Want to keep your tasting notes?", loginBody: "Guests can browse every public recipe. Verify your email to rate drinks, add recipes and sync records across devices.", loginAction: "Email sign in / register",
+    addEyebrow: "NEW MIX · NEW EXPERIMENT", addTitle: "Add your own recipe", addIntro: "Enter at least two drinks. It will be saved to your Firebase account.", closeAdd: "Close add recipe dialog",
     drinkA: "Drink A *", drinkB: "Drink B *", drinkC: "Drink C (optional)", mixName: "Mix name (optional)", ratioLabel: "Suggested ratio", method: "Mixing method", tasteLike: "What might it taste like?",
     exampleTea: "e.g. jasmine tea", exampleMilk: "e.g. Wangzai milk", exampleYakult: "e.g. Yakult", autoName: "Leave blank to combine names", ratioExample: "e.g. tea : milk = 2 : 1", methodExample: "e.g. add over ice in order", expectation: "Write down your expectation now; add a rating after you try it.", cancel: "Not now", saveBook: "Save to notebook",
-    starFirst: "Choose at least one star first", savedRating: "Rating saved on this device", loginRequired: "Please sign in to add recipes or ratings", defaultRatio: "To taste", defaultNote: "No flavor note yet. Come back and rate it after tasting.", defaultMethod: "Add over ice in order and stir gently", customSource: "My recipe · current device", added: "Your new mix is in the notebook", deleteConfirm: "Delete", deviceOnly: "This only removes this account's record on this device.", deleted: "Recipe removed from your notebook",
+    starFirst: "Choose at least one star first", savedRating: "Rating synced to your account", loginRequired: "Please sign in to add recipes or ratings", verifyRequired: "Please verify your email first", defaultRatio: "To taste", defaultNote: "No flavor note yet. Come back and rate it after tasting.", defaultMethod: "Add over ice in order and stir gently", customSource: "My recipe · cloud account", added: "Your new mix is synced to the notebook", deleteConfirm: "Delete", deviceOnly: "This removes the record from your cloud account.", deleted: "Recipe removed from your cloud notebook",
+    authTitleSignIn: "Email sign in", authTitleRegister: "Create a MixLab account", authTitleReset: "Reset password", authEmail: "Email address", authPassword: "Password", authConfirm: "Confirm password",
+    authSubmitSignIn: "Sign in", authSubmitRegister: "Register and send verification", authSubmitReset: "Send reset email", authNoAccount: "New to MixLab?", authHasAccount: "Already have an account?", authCreate: "Create account", authBackSignIn: "Back to sign in", authForgot: "Forgot password?",
+    verifyTitle: "Verify your email", verifyBody: "We sent a verification link. Open it, then return here and refresh your status.", resendVerification: "Resend verification email", checkVerified: "I have verified my email", unverified: "Email not verified", verified: "Email verified",
+    verificationSent: "Verification sent. Check your inbox and spam folder", resetSent: "Password reset email sent", signedIn: "Signed in", registered: "Account created. Please verify your email", signedOut: "Signed out safely", emailVerifiedNow: "Email verified. Your cloud notebook is unlocked",
+    passwordMismatch: "The passwords do not match", passwordLength: "Password must be at least 6 characters", authGenericError: "Something went wrong. Please try again", cloudLoadError: "Cloud records could not be loaded. Check your connection and retry", cloudSaveError: "Cloud save failed. Check your connection and retry", authClose: "Close sign-in dialog",
   },
 } as const;
 
@@ -452,6 +472,24 @@ function safeLoad<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function firebaseErrorMessage(error: unknown, locale: Locale): string {
+  const code =
+    typeof error === "object" && error && "code" in error
+      ? String((error as { code: unknown }).code)
+      : "";
+  const messages: Record<string, { zh: string; en: string }> = {
+    "auth/email-already-in-use": { zh: "这个邮箱已经注册过", en: "This email is already registered" },
+    "auth/invalid-email": { zh: "请输入有效的邮箱地址", en: "Enter a valid email address" },
+    "auth/invalid-credential": { zh: "邮箱或密码不正确", en: "Incorrect email or password" },
+    "auth/user-disabled": { zh: "这个账户已被停用", en: "This account has been disabled" },
+    "auth/too-many-requests": { zh: "尝试次数过多，请稍后再试", en: "Too many attempts. Please try again later" },
+    "auth/network-request-failed": { zh: "网络连接失败，请检查网络", en: "Network request failed. Check your connection" },
+    "auth/weak-password": { zh: "密码强度不足，请至少使用 6 个字符", en: "Use a password with at least 6 characters" },
+    "auth/unauthorized-domain": { zh: "当前网站域名尚未加入 Firebase 授权域名", en: "This domain is not yet authorized in Firebase" },
+  };
+  return messages[code]?.[locale] ?? copy[locale].authGenericError;
 }
 
 function RatingBar({ label, value, accent }: { label: string; value: number; accent: Accent }) {
@@ -533,11 +571,14 @@ export default function Home() {
   const [sessionReady, setSessionReady] = useState(false);
   const [customMixes, setCustomMixes] = useState<Mix[]>([]);
   const [ratings, setRatings] = useState<Record<string, Rating>>({});
-  const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<(typeof filters)[number]>("全部搭配");
   const [search, setSearch] = useState("");
   const [selectedMix, setSelectedMix] = useState<Mix | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode | null>(null);
+  const [authError, setAuthError] = useState("");
+  const [authPending, setAuthPending] = useState(false);
+  const [actionPending, setActionPending] = useState(false);
   const [draftRating, setDraftRating] = useState<Rating>(blankRating);
   const [toast, setToast] = useState("");
   const t = copy[locale];
@@ -545,45 +586,107 @@ export default function Home() {
   useEffect(() => {
     const savedLocale = safeLoad<Locale>(LOCALE_KEY, "zh");
     if (savedLocale === "zh" || savedLocale === "en") {
-      setLocale(savedLocale);
       document.documentElement.lang = savedLocale === "zh" ? "zh-CN" : "en";
+      const timeout = window.setTimeout(() => setLocale(savedLocale), 0);
+      return () => window.clearTimeout(timeout);
     }
-    fetch("/api/session", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((data: { user?: SessionUser | null }) => setUser(data.user ?? null))
-      .catch(() => setUser(null))
-      .finally(() => setSessionReady(true));
   }, []);
 
   useEffect(() => {
-    if (!sessionReady) return;
-    setLoaded(false);
-    if (user) {
-      setCustomMixes(safeLoad<Mix[]>(`${MIXES_KEY}:${user.email}`, []));
-      setRatings(safeLoad<Record<string, Rating>>(`${RATINGS_KEY}:${user.email}`, {}));
-    } else {
-      setCustomMixes([]);
-      setRatings({});
-      setFilter((current) => current === "我的配方" ? "全部搭配" : current);
-      setIsAdding(false);
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+
+    observeFirebaseSession((nextUser) => {
+      if (!active) return;
+      setUser(nextUser);
+      setSessionReady(true);
+    })
+      .then((stop) => {
+        if (active) unsubscribe = stop;
+        else stop();
+      })
+      .catch(() => {
+        if (!active) return;
+        setUser(null);
+        setSessionReady(true);
+        setToast(copy.zh.authGenericError);
+      });
+
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!sessionReady) return () => { cancelled = true; };
+
+    async function loadCloudData() {
+      if (!user?.emailVerified) {
+        setCustomMixes([]);
+        setRatings({});
+        setFilter((current) => current === "我的配方" ? "全部搭配" : current);
+        setIsAdding(false);
+        return;
+      }
+
+      try {
+        const [remoteMixes, remoteRatingDocs] = await Promise.all([
+          listUserDocuments<Mix>(user.uid, "recipes"),
+          listUserDocuments<Rating & { id: string }>(user.uid, "ratings"),
+        ]);
+        let nextMixes = remoteMixes;
+        let nextRatings = Object.fromEntries(
+          remoteRatingDocs.map(({ id, ...rating }) => [id, rating as Rating]),
+        );
+
+        const migrationKey = `mixlab-firestore-migrated-v1:${user.uid}`;
+        if (!window.localStorage.getItem(migrationKey)) {
+          const localMixes = safeLoad<Mix[]>(`${MIXES_KEY}:${user.email}`, []);
+          const localRatings = safeLoad<Record<string, Rating>>(
+            `${RATINGS_KEY}:${user.email}`,
+            {},
+          );
+          const remoteMixIds = new Set(remoteMixes.map((mix) => mix.id));
+          await Promise.all([
+            ...localMixes
+              .filter((mix) => !remoteMixIds.has(mix.id))
+              .map((mix) => saveUserDocument(user.uid, "recipes", mix.id, mix)),
+            ...Object.entries(localRatings)
+              .filter(([mixId]) => !nextRatings[mixId])
+              .map(([mixId, rating]) =>
+                saveUserDocument(user.uid, "ratings", mixId, rating),
+              ),
+          ]);
+          nextMixes = Array.from(
+            new Map([...localMixes, ...remoteMixes].map((mix) => [mix.id, mix])).values(),
+          );
+          nextRatings = { ...localRatings, ...nextRatings };
+          window.localStorage.setItem(migrationKey, "done");
+        }
+
+        if (!cancelled) {
+          setCustomMixes(nextMixes);
+          setRatings(nextRatings);
+        }
+      } catch {
+        if (!cancelled) {
+          setCustomMixes([]);
+          setRatings({});
+          setToast(copy[locale].cloudLoadError);
+        }
+      }
     }
-    setLoaded(true);
-  }, [sessionReady, user]);
+
+    void loadCloudData();
+    return () => { cancelled = true; };
+  }, [locale, sessionReady, user?.email, user?.emailVerified, user?.uid]);
 
   useEffect(() => {
-    if (!loaded || !user) return;
-    window.localStorage.setItem(`${MIXES_KEY}:${user.email}`, JSON.stringify(customMixes));
-  }, [customMixes, loaded, user]);
-
-  useEffect(() => {
-    if (!loaded || !user) return;
-    window.localStorage.setItem(`${RATINGS_KEY}:${user.email}`, JSON.stringify(ratings));
-  }, [ratings, loaded, user]);
-
-  useEffect(() => {
-    document.body.style.overflow = selectedMix || isAdding ? "hidden" : "";
+    document.body.style.overflow = selectedMix || isAdding || authMode ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [selectedMix, isAdding]);
+  }, [authMode, selectedMix, isAdding]);
 
   useEffect(() => {
     if (!toast) return;
@@ -602,9 +705,10 @@ export default function Home() {
     });
   }, [allMixes, filter, locale, search]);
 
-  const ratedCount = user ? Object.values(ratings).filter((rating) => rating.taste > 0).length : 0;
+  const canWrite = Boolean(user?.emailVerified);
+  const ratedCount = canWrite ? Object.values(ratings).filter((rating) => rating.taste > 0).length : 0;
   const selectedDisplay = selectedMix ? displayMix(selectedMix, locale) : null;
-  const availableFilters = filters.filter((item) => item !== "我的配方" || user);
+  const availableFilters = filters.filter((item) => item !== "我的配方" || canWrite);
 
   function switchLocale() {
     const nextLocale: Locale = locale === "zh" ? "en" : "zh";
@@ -613,9 +717,109 @@ export default function Home() {
     document.documentElement.lang = nextLocale === "zh" ? "zh-CN" : "en";
   }
 
+  function openAuth(mode: AuthMode = "signin") {
+    setAuthError("");
+    setAuthMode(mode);
+  }
+
+  async function submitAuth(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") ?? "").trim();
+    const password = String(form.get("password") ?? "");
+    const confirmPassword = String(form.get("confirmPassword") ?? "");
+
+    if (authMode === "register") {
+      if (password.length < 6) {
+        setAuthError(t.passwordLength);
+        return;
+      }
+      if (password !== confirmPassword) {
+        setAuthError(t.passwordMismatch);
+        return;
+      }
+    }
+
+    setAuthPending(true);
+    setAuthError("");
+    try {
+      if (authMode === "register") {
+        const nextUser = await registerWithEmail(email, password);
+        setUser(nextUser);
+        setAuthMode("verify");
+        setToast(t.registered);
+      } else if (authMode === "reset") {
+        await sendFirebasePasswordReset(email);
+        setAuthMode("signin");
+        setToast(t.resetSent);
+      } else {
+        const nextUser = await signInWithEmail(email, password);
+        setUser(nextUser);
+        setAuthMode(nextUser.emailVerified ? null : "verify");
+        setToast(nextUser.emailVerified ? t.signedIn : t.verifyRequired);
+      }
+    } catch (error) {
+      setAuthError(firebaseErrorMessage(error, locale));
+    } finally {
+      setAuthPending(false);
+    }
+  }
+
+  async function handleSignOut() {
+    setActionPending(true);
+    try {
+      await signOutFirebase();
+      setAuthMode(null);
+      closeDetails();
+      setToast(t.signedOut);
+    } catch (error) {
+      setToast(firebaseErrorMessage(error, locale));
+    } finally {
+      setActionPending(false);
+    }
+  }
+
+  async function handleResendVerification() {
+    setAuthPending(true);
+    setAuthError("");
+    try {
+      await resendFirebaseVerification();
+      setToast(t.verificationSent);
+    } catch (error) {
+      setAuthError(firebaseErrorMessage(error, locale));
+    } finally {
+      setAuthPending(false);
+    }
+  }
+
+  async function handleRefreshVerification() {
+    setAuthPending(true);
+    setAuthError("");
+    try {
+      const nextUser = await refreshFirebaseSession();
+      setUser(nextUser);
+      if (nextUser?.emailVerified) {
+        setAuthMode(null);
+        setToast(t.emailVerifiedNow);
+      } else {
+        setAuthError(t.verifyRequired);
+      }
+    } catch (error) {
+      setAuthError(firebaseErrorMessage(error, locale));
+    } finally {
+      setAuthPending(false);
+    }
+  }
+
   function requestAdd() {
     if (!user) {
+      openAuth("signin");
       setToast(t.loginRequired);
+      return;
+    }
+    if (!user.emailVerified) {
+      openAuth("verify");
+      setToast(t.verifyRequired);
       return;
     }
     setIsAdding(true);
@@ -631,10 +835,16 @@ export default function Home() {
     setDraftRating({ ...blankRating });
   }
 
-  function saveRating(event: FormEvent<HTMLFormElement>) {
+  async function saveRating(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!user) {
+      openAuth("signin");
       setToast(t.loginRequired);
+      return;
+    }
+    if (!user.emailVerified) {
+      openAuth("verify");
+      setToast(t.verifyRequired);
       return;
     }
     if (!selectedMix || draftRating.taste === 0) {
@@ -642,16 +852,31 @@ export default function Home() {
       return;
     }
     const nextRating = { ...draftRating, updatedAt: new Date().toISOString() };
-    setRatings((current) => ({ ...current, [selectedMix.id]: nextRating }));
-    setDraftRating(nextRating);
-    setToast(t.savedRating);
+    setActionPending(true);
+    try {
+      await saveUserDocument(user.uid, "ratings", selectedMix.id, nextRating);
+      setRatings((current) => ({ ...current, [selectedMix.id]: nextRating }));
+      setDraftRating(nextRating);
+      setToast(t.savedRating);
+    } catch {
+      setToast(t.cloudSaveError);
+    } finally {
+      setActionPending(false);
+    }
   }
 
-  function addMix(event: FormEvent<HTMLFormElement>) {
+  async function addMix(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!user) {
       setIsAdding(false);
+      openAuth("signin");
       setToast(t.loginRequired);
+      return;
+    }
+    if (!user.emailVerified) {
+      setIsAdding(false);
+      openAuth("verify");
+      setToast(t.verifyRequired);
       return;
     }
     const form = new FormData(event.currentTarget);
@@ -672,24 +897,43 @@ export default function Home() {
       accent: (["blue", "red", "yellow", "green", "purple"] as Accent[])[customMixes.length % 5],
       isCustom: true,
     };
-    setCustomMixes((current) => [newMix, ...current]);
-    setIsAdding(false);
-    setFilter("我的配方");
-    setSearch("");
-    setToast(t.added);
+    setActionPending(true);
+    try {
+      await saveUserDocument(user.uid, "recipes", newMix.id, newMix);
+      setCustomMixes((current) => [newMix, ...current]);
+      setIsAdding(false);
+      setFilter("我的配方");
+      setSearch("");
+      setToast(t.added);
+    } catch {
+      setToast(t.cloudSaveError);
+    } finally {
+      setActionPending(false);
+    }
   }
 
-  function deleteCustomMix() {
+  async function deleteCustomMix() {
     if (!user || !selectedMix?.isCustom) return;
     if (!window.confirm(`${t.deleteConfirm} “${selectedMix.name}”? ${t.deviceOnly}`)) return;
-    setCustomMixes((current) => current.filter((mix) => mix.id !== selectedMix.id));
-    setRatings((current) => {
-      const next = { ...current };
-      delete next[selectedMix.id];
-      return next;
-    });
-    closeDetails();
-    setToast(t.deleted);
+    setActionPending(true);
+    try {
+      await Promise.all([
+        deleteUserDocument(user.uid, "recipes", selectedMix.id),
+        deleteUserDocument(user.uid, "ratings", selectedMix.id),
+      ]);
+      setCustomMixes((current) => current.filter((mix) => mix.id !== selectedMix.id));
+      setRatings((current) => {
+        const next = { ...current };
+        delete next[selectedMix.id];
+        return next;
+      });
+      closeDetails();
+      setToast(t.deleted);
+    } catch {
+      setToast(t.cloudSaveError);
+    } finally {
+      setActionPending(false);
+    }
   }
 
   return (
@@ -710,11 +954,11 @@ export default function Home() {
           {user ? (
             <div className="account-menu" title={user.email}>
               <span className="account-avatar" aria-hidden="true">{user.displayName.trim().charAt(0).toUpperCase()}</span>
-              <span className="account-name"><small>{t.account}</small><b>{user.displayName}</b></span>
-              <a href="/signout-with-chatgpt?return_to=%2F">{t.signOut}</a>
+              <span className="account-name"><small>{user.emailVerified ? t.verified : t.unverified}</small><b>{user.displayName}</b></span>
+              <button type="button" onClick={handleSignOut} disabled={actionPending}>{t.signOut}</button>
             </div>
           ) : (
-            <a className="auth-button" href="/signin-with-chatgpt?return_to=%2F"><span aria-hidden="true">↗</span>{t.signIn}</a>
+            <button className="auth-button" type="button" onClick={() => openAuth("signin")}><span aria-hidden="true">↗</span>{t.signIn}</button>
           )}
         </div>
       </header>
@@ -727,8 +971,8 @@ export default function Home() {
             <p>{t.heroBody}</p>
             <div className="hero-stats" aria-label={t.statsLabel}>
               <div><b>{featuredMixes.length}</b><span>{t.webIdeas}</span></div>
-              <div><b>{user ? customMixes.length : "—"}</b><span>{user ? t.myRecipes : t.guest}</span></div>
-              <div><b>{user ? ratedCount : "—"}</b><span>{user ? t.localRatings : t.guest}</span></div>
+              <div><b>{canWrite ? customMixes.length : "—"}</b><span>{canWrite ? t.myRecipes : t.guest}</span></div>
+              <div><b>{canWrite ? ratedCount : "—"}</b><span>{canWrite ? t.localRatings : t.guest}</span></div>
             </div>
           </div>
           <div className="hero-art" aria-label={t.artLabel}>
@@ -751,10 +995,12 @@ export default function Home() {
               </button>
             ))}
           </div>
-          {user ? (
+          {canWrite ? (
             <button className="primary-button" type="button" onClick={requestAdd}><span>＋</span>{t.addMine}</button>
+          ) : user ? (
+            <button className="primary-button signin-cta" type="button" onClick={() => openAuth("verify")}><span>✉</span>{t.verifyRequired}</button>
           ) : (
-            <a className="primary-button signin-cta" href="/signin-with-chatgpt?return_to=%2F"><span>↗</span>{t.loginAction}</a>
+            <button className="primary-button signin-cta" type="button" onClick={() => openAuth("signin")}><span>↗</span>{t.loginAction}</button>
           )}
         </section>
 
@@ -771,7 +1017,7 @@ export default function Home() {
             <div className="recipe-grid">
               {visibleMixes.map((mix, index) => {
                 const shownMix = displayMix(mix, locale);
-                const rating = user ? ratings[mix.id] : undefined;
+                const rating = canWrite ? ratings[mix.id] : undefined;
                 return (
                   <article className={`recipe-card accent-card-${mix.accent}`} key={mix.id}>
                     <span className="card-tape" aria-hidden="true" />
@@ -793,10 +1039,10 @@ export default function Home() {
                         </div>
                       </div>
                     ) : (
-                      <div className={`empty-rating ${user ? "" : "guest-rating"}`}><span>{user ? "☆☆☆☆☆" : "♙"}</span><p>{user ? t.noRating : t.guestRating}</p></div>
+                      <div className={`empty-rating ${canWrite ? "" : "guest-rating"}`}><span>{canWrite ? "☆☆☆☆☆" : "♙"}</span><p>{canWrite ? t.noRating : t.guestRating}</p></div>
                     )}
                     <button className="card-action" type="button" onClick={() => openMix(mix)}>
-                      {user ? (rating?.taste ? t.editRating : t.rateAfter) : t.viewRecipe}<span aria-hidden="true">↗</span>
+                      {canWrite ? (rating?.taste ? t.editRating : t.rateAfter) : t.viewRecipe}<span aria-hidden="true">↗</span>
                     </button>
                   </article>
                 );
@@ -804,15 +1050,15 @@ export default function Home() {
             </div>
           ) : (
             <div className="empty-state">
-              <span>🥤</span><h3>{t.emptyTitle}</h3><p>{user ? t.emptyBodyUser : t.emptyBodyGuest}</p>
-              {user ? <button className="primary-button" type="button" onClick={requestAdd}>＋ {t.addRecipe}</button> : null}
+              <span>🥤</span><h3>{t.emptyTitle}</h3><p>{canWrite ? t.emptyBodyUser : t.emptyBodyGuest}</p>
+              {canWrite ? <button className="primary-button" type="button" onClick={requestAdd}>＋ {t.addRecipe}</button> : null}
             </div>
           )}
         </section>
 
         <footer className="site-footer">
           <p>{t.footerLead}</p>
-          <span>{user ? t.footerUser : t.footerGuest}</span>
+          <span>{canWrite ? t.footerUser : t.footerGuest}</span>
           <span className="photo-credit">{t.photoCredit}: {locale === "zh" ? "品牌官网与零售商品页" : "brand and retailer product pages"} · <a href="https://unsplash.com/photos/brown-and-pink-round-fruit-on-white-table-9TboYEv1uZo" target="_blank" rel="noreferrer">{locale === "zh" ? "鲜荔枝实拍" : "fresh lychee photo"}</a></span>
         </footer>
       </main>
@@ -834,9 +1080,9 @@ export default function Home() {
                 <div className="detail-ratio"><span>{t.ratio}</span><b>{selectedDisplay.ratio}</b></div>
                 <ol className="steps-list">{selectedDisplay.steps.map((step, index) => <li key={`${step}-${index}`}>{step}</li>)}</ol>
                 {selectedMix.sourceUrl ? <a className="source-link" href={selectedMix.sourceUrl} target="_blank" rel="noreferrer">{t.viewSource}</a> : null}
-                {user && selectedMix.isCustom ? <button className="delete-link" type="button" onClick={deleteCustomMix}>{t.deleteMine}</button> : null}
+                {canWrite && selectedMix.isCustom ? <button className="delete-link" type="button" onClick={deleteCustomMix} disabled={actionPending}>{t.deleteMine}</button> : null}
               </div>
-              {user ? (
+              {canWrite ? (
                 <form className="rating-form" onSubmit={saveRating}>
                   <div className="rating-form-heading"><span>{t.report}</span><h3>{t.reportTitle}</h3><p>{t.reportBody}</p></div>
                   <fieldset className="stars-field">
@@ -861,12 +1107,17 @@ export default function Home() {
                   ))}
                   <label className="remake-check"><input type="checkbox" checked={draftRating.remake} onChange={(event) => setDraftRating((current) => ({ ...current, remake: event.target.checked }))} /><span aria-hidden="true" /> {t.remake}</label>
                   <label className="note-field"><span>{t.flavorNote}</span><textarea rows={3} maxLength={120} value={draftRating.note} onChange={(event) => setDraftRating((current) => ({ ...current, note: event.target.value }))} placeholder={t.notePlaceholder} /></label>
-                  <button className="primary-button form-submit" type="submit">{t.saveRating}</button>
+                  <button className="primary-button form-submit" type="submit" disabled={actionPending}>{t.saveRating}</button>
                 </form>
               ) : (
                 <aside className="guest-panel">
-                  <span className="guest-lock" aria-hidden="true">♙</span><em>{t.loginKicker}</em><h3>{t.loginTitle}</h3><p>{t.loginBody}</p>
-                  <a className="primary-button" href="/signin-with-chatgpt?return_to=%2F">{t.loginAction}<span>↗</span></a>
+                  <span className="guest-lock" aria-hidden="true">{user ? "✉" : "♙"}</span>
+                  <em>{user ? t.unverified : t.loginKicker}</em>
+                  <h3>{user ? t.verifyTitle : t.loginTitle}</h3>
+                  <p>{user ? t.verifyBody : t.loginBody}</p>
+                  <button className="primary-button" type="button" onClick={() => openAuth(user ? "verify" : "signin")}>
+                    {user ? t.checkVerified : t.loginAction}<span>↗</span>
+                  </button>
                 </aside>
               )}
             </div>
@@ -874,7 +1125,7 @@ export default function Home() {
         </div>
       ) : null}
 
-      {isAdding && user ? (
+      {isAdding && canWrite ? (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsAdding(false); }}>
           <section className="modal-card add-modal" role="dialog" aria-modal="true" aria-labelledby="add-title">
             <button className="modal-close" type="button" onClick={() => setIsAdding(false)} aria-label={t.closeAdd}>×</button>
@@ -893,8 +1144,67 @@ export default function Home() {
                 <label><span>{t.method}</span><input name="method" maxLength={80} placeholder={t.methodExample} /></label>
               </div>
               <label className="full-field"><span>{t.tasteLike}</span><textarea name="note" rows={3} maxLength={140} placeholder={t.expectation} /></label>
-              <div className="form-actions"><button className="secondary-button" type="button" onClick={() => setIsAdding(false)}>{t.cancel}</button><button className="primary-button" type="submit">{t.saveBook}</button></div>
+              <div className="form-actions"><button className="secondary-button" type="button" onClick={() => setIsAdding(false)}>{t.cancel}</button><button className="primary-button" type="submit" disabled={actionPending}>{t.saveBook}</button></div>
             </form>
+          </section>
+        </div>
+      ) : null}
+
+      {authMode ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setAuthMode(null); }}>
+          <section className="modal-card auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+            <button className="modal-close" type="button" onClick={() => setAuthMode(null)} aria-label={t.authClose}>×</button>
+            <span className="eyebrow">FIREBASE ACCOUNT</span>
+            {authMode === "verify" ? (
+              <div className="verification-panel">
+                <span className="verification-icon" aria-hidden="true">✉</span>
+                <h2 id="auth-title">{t.verifyTitle}</h2>
+                <p>{t.verifyBody}</p>
+                {user?.email ? <strong>{user.email}</strong> : null}
+                {authError ? <p className="auth-error" role="alert">{authError}</p> : null}
+                <div className="verification-actions">
+                  <button className="primary-button" type="button" onClick={handleRefreshVerification} disabled={authPending}>{t.checkVerified}</button>
+                  <button className="secondary-button" type="button" onClick={handleResendVerification} disabled={authPending}>{t.resendVerification}</button>
+                </div>
+              </div>
+            ) : (
+              <form className="auth-form" onSubmit={submitAuth}>
+                <h2 id="auth-title">
+                  {authMode === "signin" ? t.authTitleSignIn : authMode === "register" ? t.authTitleRegister : t.authTitleReset}
+                </h2>
+                <p>{authMode === "reset" ? t.authForgot : t.loginBody}</p>
+                <label>
+                  <span>{t.authEmail}</span>
+                  <input name="email" type="email" required autoComplete="email" />
+                </label>
+                {authMode !== "reset" ? (
+                  <label>
+                    <span>{t.authPassword}</span>
+                    <input name="password" type="password" required minLength={6} autoComplete={authMode === "register" ? "new-password" : "current-password"} />
+                  </label>
+                ) : null}
+                {authMode === "register" ? (
+                  <label>
+                    <span>{t.authConfirm}</span>
+                    <input name="confirmPassword" type="password" required minLength={6} autoComplete="new-password" />
+                  </label>
+                ) : null}
+                {authError ? <p className="auth-error" role="alert">{authError}</p> : null}
+                <button className="primary-button auth-submit" type="submit" disabled={authPending}>
+                  {authMode === "signin" ? t.authSubmitSignIn : authMode === "register" ? t.authSubmitRegister : t.authSubmitReset}
+                </button>
+                <div className="auth-links">
+                  {authMode === "signin" ? (
+                    <>
+                      <button type="button" onClick={() => openAuth("register")}>{t.authNoAccount} {t.authCreate}</button>
+                      <button type="button" onClick={() => openAuth("reset")}>{t.authForgot}</button>
+                    </>
+                  ) : (
+                    <button type="button" onClick={() => openAuth("signin")}>{authMode === "register" ? t.authHasAccount : null} {t.authBackSignIn}</button>
+                  )}
+                </div>
+              </form>
+            )}
           </section>
         </div>
       ) : null}

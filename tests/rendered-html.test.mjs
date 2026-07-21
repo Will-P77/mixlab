@@ -13,13 +13,13 @@ async function render() {
   );
 }
 
-async function requestSession(headers = {}) {
+async function requestPath(pathname) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("session-test", `${process.pid}-${Date.now()}-${Math.random()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request("http://localhost/api/session", { headers }),
+    new Request(`http://localhost${pathname}`),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
     { waitUntil() {}, passThroughOnException() {} },
   );
@@ -46,27 +46,15 @@ test("server-renders the MixLab product shell", async () => {
   assert.doesNotMatch(html, /\/ingredients\/(?:tea|milk|grapes)\.jpg/);
   assert.doesNotMatch(html, /\/packages\/dailyc-grape\.webp/);
   assert.match(html, /Switch to English/);
-  assert.match(html, /\/signin-with-chatgpt\?return_to=%2F/);
+  assert.match(html, /邮箱登录 \/ 注册/);
   assert.match(html, /当前为访客只读模式/);
   assert.match(html, /登录后可评分并保存记录/);
+  assert.doesNotMatch(html, /signin-with-chatgpt|signout-with-chatgpt/);
   assert.doesNotMatch(html, /贴一张自己的配方/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });
 
-test("session endpoint distinguishes guests and signed-in visitors", async () => {
-  const guestResponse = await requestSession();
-  assert.deepEqual(await guestResponse.json(), { user: null });
-
-  const signedInResponse = await requestSession({
-    "oai-authenticated-user-email": "mixer@example.com",
-    "oai-authenticated-user-full-name": "Mix%20Tester",
-    "oai-authenticated-user-full-name-encoding": "percent-encoded-utf-8",
-  });
-  assert.deepEqual(await signedInResponse.json(), {
-    user: {
-      displayName: "Mix Tester",
-      email: "mixer@example.com",
-      fullName: "Mix Tester",
-    },
-  });
+test("legacy platform session endpoint has been removed", async () => {
+  const response = await requestPath("/api/session");
+  assert.equal(response.status, 404);
 });

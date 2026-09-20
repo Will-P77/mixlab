@@ -46,9 +46,10 @@ test("server-renders the MixLab product shell", async () => {
   assert.doesNotMatch(html, /\/ingredients\/(?:tea|milk|grapes)\.jpg/);
   assert.doesNotMatch(html, /\/packages\/dailyc-grape\.webp/);
   assert.match(html, /Switch to English/);
-  assert.match(html, /邮箱登录 \/ 注册/);
-  assert.match(html, /当前为访客只读模式/);
-  assert.match(html, /登录后可评分并保存记录/);
+  assert.match(html, /添加我的搭配/);
+  assert.match(html, /全部功能无需登录/);
+  assert.match(html, /自建配方与评分保存在当前浏览器/);
+  assert.doesNotMatch(html, /邮箱登录|创建 MixLab 账户|访客只读/);
   assert.doesNotMatch(html, /signin-with-chatgpt|signout-with-chatgpt/);
   assert.doesNotMatch(html, /贴一张自己的配方/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);

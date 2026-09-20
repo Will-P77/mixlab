@@ -7,9 +7,9 @@
 
 # MixLab Drink Notebook
 
-MixLab is a bilingual web project for collecting convenience-store drink combinations. Visitors can browse recipes and see the original retail packaging for each ingredient. Signed-in users can add their own combinations and record tasting ratings.
+MixLab is a bilingual web project for collecting convenience-store drink combinations. Anyone can browse recipes, see the original retail packaging for each ingredient, add combinations, and record tasting ratings without signing in.
 
-**Live site: [mixlab-drink-notes.pht358501.chatgpt.site](https://mixlab-drink-notes.pht358501.chatgpt.site)**
+**Live site: [mixlab.drinklab.workers.dev](https://mixlab.drinklab.workers.dev)**
 
 ## Features
 
@@ -17,10 +17,8 @@ MixLab is a bilingual web project for collecting convenience-store drink combina
 - Filters for milky tea, fruit soda, cultured-milk tea, and refreshing tea
 - Ingredient ratios, preparation steps, and tasting notes
 - Simplified Chinese and English interface
-- Read-only recipe browsing for guests
-- Email registration, sign-in, verification, and password reset
-- Custom recipes and ratings for verified users
-- Cross-device recipe and rating sync through Firestore
+- Open recipe browsing, custom recipes, and ratings with no account required
+- Custom recipes and ratings are saved automatically in the current browser
 - Original retail package images on recipe cards
 - Responsive desktop and mobile layouts
 
@@ -31,7 +29,6 @@ MixLab is a bilingual web project for collecting convenience-store drink combina
 - [Vinext](https://github.com/cloudflare/vinext)
 - [Vite](https://vite.dev/)
 - [Cloudflare Workers](https://workers.cloudflare.com/)-compatible runtime
-- [Firebase Authentication](https://firebase.google.com/docs/auth) and [Cloud Firestore](https://firebase.google.com/docs/firestore)
 - TypeScript
 
 ## Run Locally
@@ -47,11 +44,10 @@ MixLab is a bilingual web project for collecting convenience-store drink combina
 git clone https://github.com/Will-P77/mixlab.git
 cd mixlab
 npm install
-cp .env.example .env.local
 npm run dev
 ```
 
-Add your Firebase Web app configuration to `.env.local`, then open the local URL printed by the development server. Firebase Web configuration identifies a project and is not an admin secret; never put a service-account private key in frontend environment variables.
+Open the local URL printed by the development server. No external account or environment variables are required.
 
 ## Commands
 
@@ -68,11 +64,9 @@ npm run db:generate  # Generate Drizzle migrations after schema changes
 ```text
 MixLab/
 ├── app/                 # Pages, styles, and API routes
-├── lib/                 # Firebase client wrapper
 ├── public/
 │   ├── ingredients/     # Ingredient images
-│   ├── packages/        # Original retail package images
-│   └── firebase/        # Official Firebase Web SDK browser modules
+│   └── packages/        # Original retail package images
 ├── tests/               # Rendering tests
 ├── worker/              # Cloudflare Worker entry point
 ├── db/                  # Optional database schema
@@ -81,17 +75,9 @@ MixLab/
 └── vite.config.ts
 ```
 
-## Authentication and Data
+## Data Storage
 
-The project uses Firebase Authentication and Firestore:
-
-- Guests can only browse recipes.
-- Users can register with any valid email, sign in, verify their address, and reset their password.
-- Only users with verified email addresses can add recipes and ratings.
-- Each user can only access data below their own `users/{uid}` Firestore path.
-- Legacy local recipes and ratings are migrated to the cloud after the first verified sign-in.
-
-Publish the repository's [`firestore.rules`](./firestore.rules) in Firebase Console and add each local, Cloudflare, or custom hostname to Authentication's Authorized domains list. The Cloudflare build environment also needs the six public variables listed in `.env.example`.
+The project no longer requires an account or email verification. Anyone can add recipes and ratings directly. Data is stored in the current browser with `localStorage`, so clearing site data, browsing privately, or changing devices will not automatically carry personal records across.
 
 ## Image Policy
 

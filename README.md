@@ -7,9 +7,9 @@
 
 # MixLab 饮料实验簿
 
-MixLab 是一个收集便利店饮料搭配的中英双语 Web 项目。你可以浏览饮料配方、查看原材料的便利店商品包装，并在登录后添加自己的搭配和记录品尝评分。
+MixLab 是一个收集便利店饮料搭配的中英双语 Web 项目。你可以浏览饮料配方、查看原材料的便利店商品包装，并直接添加自己的搭配和记录品尝评分。
 
-**在线体验：[mixlab-drink-notes.pht358501.chatgpt.site](https://mixlab-drink-notes.pht358501.chatgpt.site)**
+**在线体验：[mixlab.drinklab.workers.dev](https://mixlab.drinklab.workers.dev)**
 
 ## 功能
 
@@ -17,10 +17,8 @@ MixLab 是一个收集便利店饮料搭配的中英双语 Web 项目。你可�
 - 按奶香茶饮、果味汽水、乳酸茶和清爽茶饮筛选
 - 展示配方比例、制作步骤和饮用提示
 - 支持简体中文与英文切换
-- 访客可以查看全部公开配方
-- 支持邮箱注册、登录、验证邮件与密码重置
-- 邮箱验证用户可以添加自定义配方并记录评分
-- 配方和评分通过 Firestore 跨设备同步
+- 无需注册或登录即可查看、添加配方和记录评分
+- 自定义配方与评分自动保存在当前浏览器
 - 配方卡使用便利店可购买商品的原包装图片
 - 适配桌面和移动设备
 
@@ -31,7 +29,6 @@ MixLab 是一个收集便利店饮料搭配的中英双语 Web 项目。你可�
 - [Vinext](https://github.com/cloudflare/vinext)
 - [Vite](https://vite.dev/)
 - [Cloudflare Workers](https://workers.cloudflare.com/) 兼容运行环境
-- [Firebase Authentication](https://firebase.google.com/docs/auth) 与 [Cloud Firestore](https://firebase.google.com/docs/firestore)
 - TypeScript
 
 ## 本地运行
@@ -47,11 +44,10 @@ MixLab 是一个收集便利店饮料搭配的中英双语 Web 项目。你可�
 git clone https://github.com/Will-P77/mixlab.git
 cd mixlab
 npm install
-cp .env.example .env.local
 npm run dev
 ```
 
-在 `.env.local` 中填入 Firebase 控制台提供的 Web 应用配置，再根据终端显示的本地地址访问网站。Firebase Web 配置用于识别项目，不是管理员密钥；不要把服务账号私钥放进前端环境变量。
+根据终端显示的本地地址访问网站即可，不需要配置外部账号或环境变量。
 
 ## 常用命令
 
@@ -68,11 +64,9 @@ npm run db:generate  # 修改数据库结构后生成 Drizzle 迁移
 ```text
 MixLab/
 ├── app/                 # 页面、样式和 API 路由
-├── lib/                 # Firebase 客户端封装
 ├── public/
 │   ├── ingredients/     # 原材料图片
-│   ├── packages/        # 便利店商品原包装图片
-│   └── firebase/        # 官方 Firebase Web SDK 浏览器模块
+│   └── packages/        # 便利店商品原包装图片
 ├── tests/               # 渲染测试
 ├── worker/              # Cloudflare Worker 入口
 ├── db/                  # 可选数据库结构
@@ -81,17 +75,9 @@ MixLab/
 └── vite.config.ts
 ```
 
-## 登录和数据
+## 数据保存
 
-项目使用 Firebase Authentication 与 Firestore：
-
-- 访客只能浏览配方。
-- 用户可用任意有效邮箱注册、登录、接收验证邮件和重置密码。
-- 只有完成邮箱验证的用户可以添加配方和评分。
-- 每位用户只能读写 `users/{uid}` 下自己的 Firestore 数据。
-- 旧版浏览器本地配方与评分会在首次验证登录后迁移到云端。
-
-请把仓库中的 [`firestore.rules`](./firestore.rules) 发布到 Firebase 控制台，并将本地、Cloudflare 或自定义域名加入 Authentication 的“已获授权的网域”。Cloudflare 构建环境还需要配置 `.env.example` 中列出的六个公开环境变量。
+项目不再要求账户或邮箱验证。任何访客都可以直接添加配方和评分，内容通过浏览器 `localStorage` 保存在当前设备。清除浏览器网站数据、使用无痕窗口或更换设备时，这些个人记录不会自动同步。
 
 ## 图片说明
 
